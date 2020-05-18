@@ -1,0 +1,95 @@
+import json
+import unicodedata
+from urllib.request import urlopen
+from bs4 import BeautifulSoup
+
+baseballData = urlopen("https://sports.news.naver.com/kbaseball/record/index.nhn?category=kbo&year=2020")
+source = baseballData.read()
+baseballData.close()
+
+soup = BeautifulSoup(source, 'html.parser')
+soup = soup.find_all('script')
+
+
+def preformat_cjk(string, width, align='<', fill=' '):
+    count = (width - sum(1 + (unicodedata.east_asian_width(c) in "WF") for c in string))
+    return {
+        '>': lambda s: fill * count + s,
+        '<': lambda s: s + fill * count,
+        '^': lambda s: fill * (count / 2)
+                       + s
+                       + fill * (count / 2 + count % 2)
+}[align](string)
+
+for script in soup:
+    line = str(script)
+
+    if 'var ' in line and 'jsonTeamRecord' in line:
+        recordList = line.split('jsonTeamRecord = ')
+
+        for record in recordList:
+            if record.startswith('{'):
+                recordLine = record.splitlines()
+                for finalLine in recordLine:
+                    if finalLine.endswith('}]};'):
+                        recordJsonData = finalLine
+
+r = json.loads(recordJsonData[:-1])
+regularTeamRecordList = r['regularTeamRecordList']
+
+AA=[]
+order=0
+print('현재순위')
+for team in regularTeamRecordList:
+  t = json.loads(str(team).replace("'",'"'))
+  order += 1
+  #tn = preformat_cjk(t['teamName'], 10)
+  tn = t['teamName']
+  won = t['won']
+  lost = t['lost']
+  winDiff = t['winDiff']
+  recentResult = t['recentResult']
+  AA.append(tn)
+  print('%02d  %s  %s  %s  %-5s   %s' % (order, tn, won, lost, winDiff, recentResult))
+
+print(" ")
+
+M1 = ['롯데', '키움', '두산', 'LG', 'NC', 'KIA', 'SK', 'KT', '한화', '삼성'];
+M2 = ['두산', '키움', '롯데', 'NC', 'LG', 'SK', '삼성', 'KT', 'KIA', '한화'];
+M3 = ['두산', '키움', '롯데', 'LG', 'NC', 'SK', 'KIA', '한화', 'KT', '삼성'];
+M4 = ['키움', '두산', 'NC', '롯데', 'SK', 'LG', 'KT', 'KIA', '삼성', '한화'];
+M5 = ['두산', '키움', 'NC', '롯데', 'SK', 'LG', 'KT', 'KIA', '삼성', '한화'];
+M6 = ['롯데', '두산', '키움', 'LG', 'NC', 'KT', 'SK', '삼성', 'KIA', '한화'];
+M7 = ['키움', '두산', '롯데', 'NC', 'LG', 'SK', '삼성', 'KIA', 'KT', '한화'];
+
+MM = [M1,M2,M3,M4,M5,M6,M7]
+point = [0,0,0,0,0,0,0]
+
+for num in range(0,7):
+    for i in range(0,10):
+        if AA[i] == MM[num][i]:
+            if i == 0 or i == 9:
+                if AA[i] == '롯데':
+                    point[num] = point[num] + 40
+                else:
+                    point[num]= point[num] + 20
+            else:
+                if AA[i] == '롯데':
+                    point[num] = point[num]+20
+                else:
+                    point[num] = point[num]+10
+        if AA[i] == MM[num][i-1]:
+            if MM[num][i] == AA[i - 1]:
+                point[num] = point[num] + 10
+            else:
+                point[num] = point[num] + 5
+        elif MM[num][i] == AA[i - 1]:
+            point[num] = point[num] + 5
+print('현재점수')
+print("강성문", point[0])
+print("김건수", point[1])
+print("손건욱", point[2])
+print("안균  ", point[3])
+print("이동우", point[4])
+print("이승영", point[5])
+print("이시영", point[6])
